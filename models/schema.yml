@@ -1,0 +1,209 @@
+version: 2
+
+models:
+  - name: stg_orders
+    description: "Staging layer for TPC-H orders data"
+    meta:
+      metric_view:
+        enabled: true
+        name: mv_orders_simple
+        description: "Simple metric view with long schedule (manual refresh preferred)"
+        # Raw YAML mode with materialization
+        # Uses long schedule (8 weeks) + manual refresh via: python scripts/refresh_metric_views.py
+        yaml: |
+          version: 0.1
+          source: __SOURCE__
+          
+          dimensions:
+            - name: order_status
+              expr: order_status
+            - name: order_priority
+              expr: order_priority
+            - name: order_date
+              expr: order_date
+          
+          measures:
+            - name: order_count
+              expr: count(*)
+            - name: total_revenue
+              expr: sum(total_price)
+            - name: avg_order_value
+              expr: avg(total_price)
+          
+          # Materialization with long schedule (manual refresh preferred)
+          # Note: Databricks requires schedule - use long interval + manual refresh
+          materialization:
+            schedule: every 8 weeks
+            mode: relaxed
+            
+            materialized_views:
+              - name: baseline
+                type: unaggregated
+              
+              - name: orders_by_status
+                type: aggregated
+                dimensions:
+                  - order_status
+                measures:
+                  - order_count
+                  - total_revenue
+    
+  - name: stg_customers
+    description: "Staging layer for TPC-H customer data"
+
+  - name: fct_orders
+    description: "Fact table with order details and customer information"
+    meta:
+      metric_view:
+        enabled: true
+        name: mv_order_metrics
+        description: "Order KPIs and metrics for business analysis"
+        # Raw YAML mode - paste Databricks YAML directly
+        # Use __SOURCE__ as placeholder for the table reference
+        # Follows: https://docs.databricks.com/aws/en/metric-views/data-modeling/syntax
+        # Version 0.1 required for materialization (no semantic metadata)
+        yaml: |
+          version: 0.1
+          source: __SOURCE__
+          
+          dimensions:
+            - name: market_segment
+              expr: market_segment
+            - name: order_status
+              expr: order_status
+            - name: order_priority
+              expr: order_priority
+            - name: order_date
+              expr: order_date
+            - name: order_year
+              expr: order_year
+            - name: order_month
+              expr: order_month
+          
+          measures:
+            - name: total_orders
+              expr: count(*)
+            - name: total_revenue
+              expr: sum(total_price)
+            - name: avg_order_value
+              expr: avg(total_price)
+            - name: max_order_value
+              expr: max(total_price)
+            - name: trailing_7d_revenue
+              expr: sum(total_price)
+              window:
+                - order: order_date
+                  range: trailing 7 day
+                  semiadditive: last
+            - name: cumulative_revenue
+              expr: sum(total_price)
+              window:
+                - order: order_date
+                  range: cumulative
+                  semiadditive: last
+          
+          # Materialization - pre-compute for performance
+          materialization:
+            schedule: every 6 hours
+            mode: relaxed
+            
+            materialized_views:
+              - name: baseline
+                type: unaggregated
+              
+              - name: revenue_by_segment
+                type: aggregated
+                dimensions:
+                  - market_segment
+                  - order_status
+                measures:
+                  - total_revenue
+                  - total_orders
+              
+              - name: monthly_revenue
+                type: aggregated
+                dimensions:
+                  - order_year
+                  - order_month
+                measures:
+                  - total_revenue
+          
+
+  - name: fct_customer_summary
+    description: "Customer summary with aggregated order metrics"
+    meta:
+      metric_view:
+        enabled: true
+        name: mv_customer_metrics
+        description: "Customer KPIs for segmentation and analysis"
+        # Version 1.1 with semantic metadata (no materialization)
+        yaml: |
+          version: 1.1
+          source: __SOURCE__
+          
+          dimensions:
+            - name: market_segment
+              expr: market_segment
+              display_name: "Market Segment"
+              comment: "Customer market segment classification"
+              synonyms:
+                - "segment"
+                - "business segment"
+                - "customer type"
+          
+          measures:
+            - name: total_customers
+              expr: count(*)
+              display_name: "Total Customers"
+              comment: "Count of unique customers"
+              synonyms:
+                - "customer count"
+                - "number of customers"
+            
+            - name: total_revenue
+              expr: sum(total_spent)
+              display_name: "Total Revenue"
+              comment: "Sum of all customer spending"
+              synonyms:
+                - "revenue"
+                - "total sales"
+              format:
+                type: currency
+                currency_code: USD
+            
+            - name: avg_customer_value
+              expr: avg(total_spent)
+              display_name: "Average Customer Lifetime Value"
+              comment: "Average total spending per customer"
+              synonyms:
+                - "CLV"
+                - "customer value"
+                - "ARPU"
+              format:
+                type: currency
+                currency_code: USD
+            
+            - name: avg_orders_per_customer
+              expr: avg(total_orders)
+              display_name: "Average Orders per Customer"
+              comment: "Average number of orders placed per customer"
+              synonyms:
+                - "order frequency"
+                - "orders per customer"
+            
+            - name: high_value_customers
+              expr: count_if(total_spent > 100000)
+              display_name: "High Value Customers"
+              comment: "Count of customers with total spending over $100,000"
+              synonyms:
+                - "VIP customers"
+                - "premium customers"
+                - "top spenders"
+            
+            - name: avg_order_frequency
+              expr: avg(total_orders / nullif(datediff(last_order_date, first_order_date), 0))
+              display_name: "Average Order Frequency"
+              comment: "Average orders per day between first and last order"
+              synonyms:
+                - "purchase frequency"
+                - "buying frequency"

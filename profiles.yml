@@ -1,0 +1,15 @@
+# Copy this file to ~/.dbt/profiles.yml or set DBT_PROFILES_DIR
+# Update with your Databricks credentials
+
+databricks:
+  target: dev
+  outputs:
+    dev:
+      type: databricks
+      catalog: main
+      schema: dbt_metrics_demo
+      host: "{{ env_var('DATABRICKS_HOST') }}"
+      http_path: "{{ env_var('DATABRICKS_HTTP_PATH') }}"
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4
+

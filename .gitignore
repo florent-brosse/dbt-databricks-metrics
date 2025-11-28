@@ -1,0 +1,24 @@
+# dbt
+target/
+dbt_packages/
+logs/
+
+# Environment
+.env
+*.env
+
+# IDE
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# uv
+uv.lock
+
+# OS
+.DS_Store
+

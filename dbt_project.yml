@@ -1,0 +1,21 @@
+name: 'dbt_databricks_metrics'
+version: '1.0.0'
+config-version: 2
+
+profile: 'databricks'
+
+model-paths: ["models"]
+analysis-paths: ["analyses"]
+test-paths: ["tests"]
+seed-paths: ["seeds"]
+macro-paths: ["macros"]
+snapshot-paths: ["snapshots"]
+
+clean-targets:
+  - "target"
+  - "dbt_packages"
+
+# Run metric view generation after all models complete
+on-run-end:
+  - "{{ generate_metric_views() }}"
+

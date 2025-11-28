@@ -1,0 +1,13 @@
+[project]
+name = "dbt-databricks-metrics"
+version = "1.0.0"
+description = "A dbt project to test Unity Catalog Metric Views on Databricks"
+readme = "README.md"
+requires-python = ">=3.9,<3.13"
+dependencies = [
+    "dbt-databricks>=1.8.0",
+]
+
+[dependency-groups]
+dev = []
+
